@@ -111,6 +111,8 @@ export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) 
           <PhotoStrip photos={STRIP_C} direction="left"  speed={26} />
           <PhotoStrip photos={STRIP_A} direction="right" speed={20} />
           <PhotoStrip photos={STRIP_B} direction="left"  speed={28} />
+          <PhotoStrip photos={STRIP_C} direction="right" speed={24} />
+          <PhotoStrip photos={STRIP_A} direction="left"  speed={32} />
         </div>
         <div className="absolute inset-0 bg-ink/50" />
       </div>
