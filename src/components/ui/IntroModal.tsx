@@ -21,11 +21,11 @@ const STRIP_B = [
 ]
 const STRIP_C = [
   'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
-  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=220&q=75',
-  'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=220&q=75',
-  'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=220&q=75',
-  'https://images.unsplash.com/photo-1544025162-d76694265947?w=220&q=75',
-  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=220&q=75',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
+  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75',
+  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75',
+  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75',
 ]
 
 function PhotoStrip({ photos, direction, speed = 28 }: {
