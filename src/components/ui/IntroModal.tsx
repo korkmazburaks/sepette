@@ -4,28 +4,28 @@ import { Mail } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 const STRIP_A = [
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
   'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
-  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=220&q=75',
-  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75',
-  'https://images.unsplash.com/photo-1476224203421-74177f36d8e2?w=220&q=75',
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
   'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=220&q=75',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
+  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75',
+  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
 ]
 const STRIP_B = [
-  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75',
-  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75',
-  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
   'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75',
-  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=220&q=75',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=220&q=75',
-]
-const STRIP_C = [
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
   'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
   'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
-  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75',
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=220&q=75',
+]
+const STRIP_C = [
   'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75',
-  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75',
+  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75',
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
+  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
 ]
 
 function PhotoStrip({ photos, direction, speed = 28 }: {
