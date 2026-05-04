@@ -10,7 +10,7 @@ import { Restaurant } from '@/pages/Restaurant'
 import { Orders } from '@/pages/Orders'
 import { Profile } from '@/pages/Profile'
 import { useThemeStore } from '@/store/themeStore'
-import { IntroModal, isIntroSeen } from '@/components/ui/IntroModal'
+import { IntroModal } from '@/components/ui/IntroModal'
 import { useLangStore } from '@/store/langStore'
 
 function AnimatedRoutes() {
@@ -37,11 +37,8 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    if (!isIntroSeen()) {
-      // Slight delay so the app renders first
-      const t = setTimeout(() => setShowIntro(true), 400)
-      return () => clearTimeout(t)
-    }
+    const t = setTimeout(() => setShowIntro(true), 400)
+    return () => clearTimeout(t)
   }, [])
 
   return (
