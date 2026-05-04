@@ -4,28 +4,28 @@ import { Mail } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 const STRIP_A = [
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75', // pizza
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75', // burger
-  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=220&q=75', // food spread
-  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75', // avocado toast
-  'https://images.unsplash.com/photo-1476224203421-74177f36d8e2?w=220&q=75', // steak
-  'https://images.unsplash.com/photo-1484723045756-b1ae7b5ae3ae?w=220&q=75', // pasta
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
+  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=220&q=75',
+  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75',
+  'https://images.unsplash.com/photo-1476224203421-74177f36d8e2?w=220&q=75',
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=220&q=75',
 ]
 const STRIP_B = [
-  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=220&q=75', // restaurant
-  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75', // ramen
-  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75', // salad
-  'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=220&q=75', // tacos
-  'https://images.unsplash.com/photo-1559181567-c3190592588a?w=220&q=75', // donuts
-  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75', // curry
+  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75',
+  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75',
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
+  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75',
+  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=220&q=75',
+  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=220&q=75',
 ]
 const STRIP_C = [
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75', // pizza 2
-  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=220&q=75', // salad 2
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=220&q=75', // restaurant 2
-  'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=220&q=75', // cake
-  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75', // sushi
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75', // burger 2
+  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=220&q=75',
+  'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=220&q=75',
+  'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=220&q=75',
+  'https://images.unsplash.com/photo-1544025162-d76694265947?w=220&q=75',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=220&q=75',
 ]
 
 function PhotoStrip({ photos, direction, speed = 28 }: {
@@ -72,6 +72,7 @@ function PhotoStrip({ photos, direction, speed = 28 }: {
             draggable={false}
             className="h-24 w-36 object-cover rounded-2xl flex-none select-none"
             loading="eager"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
           />
         ))}
       </div>
@@ -121,6 +122,8 @@ export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) 
           <PhotoStrip photos={STRIP_A} direction="left"  speed={30} />
           <PhotoStrip photos={STRIP_B} direction="right" speed={22} />
           <PhotoStrip photos={STRIP_C} direction="left"  speed={26} />
+          <PhotoStrip photos={STRIP_A} direction="right" speed={20} />
+          <PhotoStrip photos={STRIP_B} direction="left"  speed={28} />
         </div>
         <div className="absolute inset-0 bg-ink/50" />
       </div>
