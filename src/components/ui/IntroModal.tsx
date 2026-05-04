@@ -33,7 +33,7 @@ function PhotoStrip({ photos, direction, speed = 28 }: {
   direction: 'left' | 'right'
   speed?: number
 }) {
-  const doubled = [...photos, ...photos]
+  const doubled = [...photos, ...photos, ...photos]
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,9 +70,8 @@ function PhotoStrip({ photos, direction, speed = 28 }: {
             src={src}
             alt=""
             draggable={false}
-            className="h-24 w-36 object-cover rounded-2xl flex-none select-none"
+            className="h-24 w-36 object-cover rounded-2xl flex-none select-none bg-stone-800"
             loading="eager"
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
           />
         ))}
       </div>
