@@ -4,28 +4,28 @@ import { Mail } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 const STRIP_A = [
-  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75',
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75',
-  'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=220&q=75',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=220&q=75',
-  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75',
-  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=220&q=75',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=220&q=75', // pizza
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75', // burger
+  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=220&q=75', // food spread
+  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=220&q=75', // avocado toast
+  'https://images.unsplash.com/photo-1476224203421-74177f36d8e2?w=220&q=75', // steak
+  'https://images.unsplash.com/photo-1484723045756-b1ae7b5ae3ae?w=220&q=75', // pasta
 ]
 const STRIP_B = [
-  'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=220&q=75',
-  'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=220&q=75',
-  'https://images.unsplash.com/photo-1546964124-0cce460f38ef?w=220&q=75',
-  'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=220&q=75',
-  'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=220&q=75',
-  'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=220&q=75',
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=220&q=75', // restaurant
+  'https://images.unsplash.com/photo-1551782519-6d9a154f3e28?w=220&q=75', // ramen
+  'https://images.unsplash.com/photo-1496116218422-d673efda7b5e?w=220&q=75', // salad
+  'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=220&q=75', // tacos
+  'https://images.unsplash.com/photo-1559181567-c3190592588a?w=220&q=75', // donuts
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=220&q=75', // curry
 ]
 const STRIP_C = [
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75',
-  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75',
-  'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=220&q=75',
-  'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=220&q=75',
-  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=220&q=75',
-  'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=220&q=75',
+  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=220&q=75', // pizza 2
+  'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=220&q=75', // salad 2
+  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=220&q=75', // restaurant 2
+  'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=220&q=75', // cake
+  'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=220&q=75', // sushi
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=220&q=75', // burger 2
 ]
 
 function PhotoStrip({ photos, direction, speed = 28 }: {
@@ -137,7 +137,7 @@ export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) 
           animate={{ y: 0, opacity: 1, transition: { delay: 0.1, type: 'spring', damping: 24 } }}
         >
           <h1 className="text-3xl font-black text-white tracking-tight">Sepette</h1>
-          <p className="text-sm text-white/60 mt-0.5">
+          <p className="text-base font-semibold text-white mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
             {de ? 'Essen. Einfach.' : 'Food. Simple.'}
           </p>
         </motion.div>
@@ -178,7 +178,7 @@ export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) 
           {/* Skip */}
           <button
             onClick={onDone}
-            className="w-full py-2 text-xs text-white/50 text-center"
+            className="w-full flex items-center justify-center py-3.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 font-semibold text-sm text-white/80 active:scale-[0.98] transition-all"
           >
             {de ? 'Ohne Konto fortfahren' : 'Continue without account'}
           </button>
