@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Restaurant } from '@/types'
-import { fetchRestaurants, MENUS } from '@/lib/lieferando'
+import { fetchRestaurants } from '@/lib/lieferando'
+import { supabase } from '@/lib/supabase'
 import { RestaurantCard } from '@/components/home/RestaurantCard'
 import { RestaurantCardSkeleton } from '@/components/ui/Skeleton'
 import { useLangStore } from '@/store/langStore'
@@ -34,11 +35,56 @@ export function Search() {
   const [query, setQuery] = useState('')
   const [all, setAll] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
+  const [foodResults, setFoodResults] = useState<FoodResult[]>([])
+  const allRef = useRef(all)
+  allRef.current = all
 
   useEffect(() => {
     fetchRestaurants().then(data => { setAll(data); setLoading(false) })
     setTimeout(() => inputRef.current?.focus(), 300)
   }, [])
+
+  // Debounced food search via Supabase
+  useEffect(() => {
+    const q = query.trim().toLowerCase()
+    if (q.length === 0) { setFoodResults([]); return }
+
+    const timer = setTimeout(async () => {
+      const { data: items } = await supabase
+        .from('menu_items')
+        .select('restaurant_id, name, price, description')
+        .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+        .eq('available', true)
+        .limit(50)
+
+      if (!items || items.length === 0) { setFoodResults([]); return }
+
+      const restaurantIds = [...new Set((items as { restaurant_id: string }[]).map(i => i.restaurant_id))]
+      const { data: slugRows } = await supabase
+        .from('restaurants')
+        .select('id, slug')
+        .in('id', restaurantIds)
+
+      const slugMap = new Map((slugRows ?? []).map((r: { id: string; slug: string }) => [r.id, r.slug]))
+
+      const grouped = new Map<string, FoodMatch[]>()
+      for (const item of items as { restaurant_id: string; name: string; price: number; description?: string }[]) {
+        const slug = slugMap.get(item.restaurant_id)
+        if (!slug) continue
+        if (!grouped.has(slug)) grouped.set(slug, [])
+        grouped.get(slug)!.push({ name: item.name, price: item.price, description: item.description || undefined })
+      }
+
+      const results: FoodResult[] = []
+      for (const [slug, foodItems] of grouped) {
+        const restaurant = allRef.current.find(r => r.slug === slug)
+        if (restaurant) results.push({ restaurant, items: foodItems })
+      }
+      setFoodResults(results)
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [query])
 
   const q = query.trim().toLowerCase()
 
@@ -47,23 +93,6 @@ export function Search() {
         r.name.toLowerCase().includes(q) ||
         r.cuisines.some(c => c.toLowerCase().includes(q))
       )
-    : []
-
-  const foodResults: FoodResult[] = q.length > 0
-    ? Object.entries(MENUS).flatMap(([slug, categories]) => {
-        const restaurant = all.find(r => r.slug === slug)
-        if (!restaurant) return []
-        const items = categories.flatMap(cat =>
-          cat.items
-            .filter(item =>
-              item.name.toLowerCase().includes(q) ||
-              item.description?.toLowerCase().includes(q)
-            )
-            .map(item => ({ name: item.name, price: item.price, description: item.description }))
-        )
-        if (items.length === 0) return []
-        return [{ restaurant, items }]
-      })
     : []
 
   const hasResults = restaurantResults.length > 0 || foodResults.length > 0

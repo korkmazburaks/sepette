@@ -32,8 +32,8 @@ function StarRow({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' }) 
           key={n}
           className={`${sz} ${
             n <= value
-              ? 'fill-amber-400 text-amber-400'
-              : 'fill-amber-200 text-amber-200'
+              ? 'fill-amber text-amber'
+              : 'fill-amber/30 text-amber/30'
           }`}
         />
       ))}
@@ -60,8 +60,8 @@ export function StarRowInteractive({
         >
           <Star className={`${sz} transition-colors ${
             n <= (hover || value)
-              ? 'fill-amber-400 text-amber-400'
-              : 'fill-amber-200 text-amber-200'
+              ? 'fill-amber text-amber'
+              : 'fill-amber/30 text-amber/30'
           }`} />
         </button>
       ))}

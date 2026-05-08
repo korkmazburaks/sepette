@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChefHat } from 'lucide-react'
+import { ChefHat, Clock } from 'lucide-react'
 import type { Restaurant as RestaurantType, MenuCategory } from '@/types'
 import { fetchRestaurants, fetchMenu } from '@/lib/lieferando'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,7 @@ import { MenuCategory as MenuCategoryComponent } from '@/components/restaurant/M
 import { ReviewsSection } from '@/components/restaurant/ReviewsSection'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useLangStore } from '@/store/langStore'
+import { getT } from '@/i18n'
 
 const pageVariants = {
   initial: { x: '100%', opacity: 0 },
@@ -26,6 +27,7 @@ export function Restaurant() {
   const [menu, setMenu] = useState<MenuCategory[]>([])
   const [loading, setLoading] = useState(true)
   const { lang } = useLangStore()
+  const t = getT(lang)
 
   const loadAll = useCallback(async () => {
     if (!slug) return
@@ -96,6 +98,21 @@ export function Restaurant() {
   return (
     <motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" className="mb-nav">
       <RestaurantHero restaurant={restaurant} />
+
+      {!restaurant.isOpen && (
+        <div className="mx-4 mt-3 flex items-start gap-3 rounded-2xl bg-coral/10 border border-coral/20 px-4 py-3">
+          <Clock className="w-4 h-4 text-coral mt-0.5 flex-none" />
+          <div>
+            <p className="text-sm font-semibold text-coral">{t.restaurant.closed}</p>
+            <p className="text-xs text-fog mt-0.5">
+              {lang === 'de'
+                ? 'Dieses Restaurant nimmt gerade keine Bestellungen an.'
+                : 'This restaurant is not accepting orders right now.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {menu.length > 0 && <MenuTabs categories={menu} />}
       <div className="mt-2">
         {menu.length === 0 ? (

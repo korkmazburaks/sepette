@@ -38,7 +38,7 @@ export function useOrders(user: User | null) {
         items: params.items,
         total: params.total,
         address: params.address,
-        status: params.scheduledFor ? 'scheduled' : 'confirmed',
+        status: params.scheduledFor ? 'scheduled' : 'pending',
         ...(params.scheduledFor ? { scheduled_for: params.scheduledFor } : {}),
         guest_name: params.guestName ?? null,
         guest_phone: params.guestPhone ?? null,

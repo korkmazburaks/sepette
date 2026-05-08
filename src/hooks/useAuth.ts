@@ -15,8 +15,16 @@ export function useAuth() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setState({ user: session?.user ?? null, loading: false, emailPending: null })
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setState((s) => ({ ...s, user: session?.user ?? null, loading: false }))
+      if (event === 'SIGNED_IN' && session?.user) {
+        const u = session.user
+        supabase.from('profiles').upsert({
+          id: u.id,
+          full_name: u.user_metadata?.full_name ?? null,
+          avatar_url: u.user_metadata?.avatar_url ?? null,
+        }, { onConflict: 'id', ignoreDuplicates: true }).then(() => {})
+      }
     })
     return () => subscription.unsubscribe()
   }, [])

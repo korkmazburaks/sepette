@@ -35,6 +35,7 @@ export interface MenuItem {
   price: number
   imageUrl?: string
   popular?: boolean
+  isAvailable?: boolean
 }
 
 export interface CartItem extends MenuItem {

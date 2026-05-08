@@ -27,10 +27,22 @@ export interface OrderRow {
   created_at: string
   guest_name: string | null
   guest_phone: string | null
+  courier_id: string | null
+  courier_lat: number | null
+  courier_lng: number | null
 }
 
 export interface OrderItem {
   name: string
   price: number
   qty: number
+}
+
+export interface ProfileRow {
+  id: string
+  full_name: string | null
+  phone: string | null
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
 }

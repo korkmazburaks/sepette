@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -30,9 +30,10 @@ const sheetVariants = {
   exit:    { y: '100%', transition: { duration: 0.22 } },
 }
 
-type ActiveStatus = 'confirmed' | 'preparing' | 'ready' | 'on_the_way' | 'delivered'
+type ActiveStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'on_the_way' | 'delivered'
 
 const STEPS: { key: ActiveStatus; icon: React.ElementType; de: string; en: string }[] = [
+  { key: 'pending',    icon: Clock,    de: 'Empfangen',   en: 'Received' },
   { key: 'confirmed',  icon: Check,    de: 'Bestätigt',   en: 'Confirmed' },
   { key: 'preparing',  icon: ChefHat,  de: 'Zubereitung', en: 'Preparing' },
   { key: 'ready',      icon: Package,  de: 'Bereit',      en: 'Ready' },
@@ -40,7 +41,16 @@ const STEPS: { key: ActiveStatus; icon: React.ElementType; de: string; en: strin
   { key: 'delivered',  icon: Check,    de: 'Geliefert',   en: 'Delivered' },
 ]
 
-const ACTIVE_STATUSES: OrderRow['status'][] = ['scheduled', 'confirmed', 'preparing', 'ready', 'on_the_way']
+const STATUS_DESCRIPTIONS: Record<string, { de: string; en: string }> = {
+  pending:    { de: 'Warte auf Bestätigung durch das Restaurant',  en: 'Waiting for restaurant confirmation' },
+  confirmed:  { de: 'Restaurant hat deine Bestellung angenommen',  en: 'Restaurant accepted your order'      },
+  preparing:  { de: 'Dein Essen wird frisch zubereitet',           en: 'Your food is being freshly prepared' },
+  ready:      { de: 'Essen fertig – Kurye holt es gleich ab',      en: 'Food is ready, courier picking it up' },
+  on_the_way: { de: 'Dein Kurye ist unterwegs zu dir',             en: 'Your courier is heading your way'    },
+  delivered:  { de: 'Guten Appetit! Wir hoffen es schmeckt 🎉',    en: "Enjoy your meal! Hope it's delicious 🎉" },
+}
+
+const ACTIVE_STATUSES: OrderRow['status'][] = ['pending', 'scheduled', 'confirmed', 'preparing', 'ready', 'on_the_way']
 
 function fmt(iso: string, de: boolean) {
   return new Date(iso).toLocaleDateString(de ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -220,11 +230,12 @@ function OrderDetailModal({
     if (delivered) return de ? 'Geliefert' : 'Delivered'
     if (cancelled) return de ? 'Storniert' : 'Cancelled'
     const map: Record<string, string> = {
-      scheduled: de ? 'Wartet auf Bestätigung' : 'Awaiting confirmation',
-      confirmed: de ? 'Bestätigt' : 'Confirmed',
-      preparing: de ? 'In Zubereitung' : 'Preparing',
-      ready:     de ? 'Bereit' : 'Ready',
-      on_the_way:de ? 'Unterwegs' : 'On the way',
+      pending:    de ? 'Empfangen' : 'Received',
+      scheduled:  de ? 'Wartet auf Bestätigung' : 'Awaiting confirmation',
+      confirmed:  de ? 'Bestätigt' : 'Confirmed',
+      preparing:  de ? 'In Zubereitung' : 'Preparing',
+      ready:      de ? 'Bereit' : 'Ready',
+      on_the_way: de ? 'Unterwegs' : 'On the way',
     }
     return map[order.status] ?? order.status
   }
@@ -353,7 +364,7 @@ function OrderDetailModal({
 
           {/* Actions */}
           <div className="px-5 pb-safe pt-3 border-t border-cloud flex-none space-y-2.5">
-            {!cancelled && (
+            {delivered && (
               <button
                 onClick={onReview}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-amber/10 text-amber font-semibold text-sm active:scale-[0.98] transition-transform"
@@ -376,6 +387,77 @@ function OrderDetailModal({
   )
 }
 
+/* ── Courier Map ── */
+function CourierMap({ lat, lng, de }: { lat: number; lng: number; de: boolean }) {
+  const [loaded, setLoaded] = useState(false)
+
+  // Round to 4 dp (~11 m) to avoid spurious iframe reloads on tiny GPS jitter
+  const rLat  = Math.round(lat * 10000) / 10000
+  const rLng  = Math.round(lng * 10000) / 10000
+  const delta = 0.006
+  const bbox  = `${rLng - delta},${rLat - delta},${rLng + delta},${rLat + delta}`
+  const src   = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${rLat},${rLng}`
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+      className="mt-4"
+    >
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <motion.span
+            className="block w-2 h-2 bg-emerald rounded-full"
+            animate={{ opacity: [1, 0.25, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
+          <span className="text-xs font-semibold text-ink">
+            {de ? 'Kurye Standort' : 'Courier location'}
+          </span>
+        </div>
+        <span className="text-[10px] text-fog/70">© OpenStreetMap</span>
+      </div>
+
+      {/* Map box */}
+      <div
+        className="relative rounded-2xl overflow-hidden bg-mist"
+        style={{ height: 200 }}
+      >
+        {/* Loading spinner overlay */}
+        {!loaded && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <div className="w-6 h-6 border-2 border-cloud border-t-wolt-base rounded-full animate-spin" />
+          </div>
+        )}
+
+        <iframe
+          key={src}
+          src={src}
+          width="100%"
+          height="200"
+          className="w-full"
+          style={{
+            border:     'none',
+            display:    'block',
+            opacity:    loaded ? 1 : 0,
+            transition: 'opacity 0.35s ease',
+          }}
+          onLoad={() => setLoaded(true)}
+          title={de ? 'Kurye Standort' : 'Courier location'}
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"
+        />
+
+        {/* Premium inset ring */}
+        <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-inset ring-black/[0.08]" />
+      </div>
+    </motion.div>
+  )
+}
+
 /* ── Tracking Card ── */
 function TrackingCard({
   order, de, onConfirmDelivered, onOpen,
@@ -388,7 +470,10 @@ function TrackingCard({
   const isCancelled = order.status === 'cancelled'
   const isOnTheWay  = order.status === 'on_the_way'
   const stepIdx     = STEPS.findIndex(s => s.key === order.status)
+  const currentStep = stepIdx >= 0 ? STEPS[stepIdx] : null
+  const StatusIcon  = currentStep?.icon ?? Clock
   const items       = Array.isArray(order.items) ? order.items : []
+  const progressPct = stepIdx > 0 ? (stepIdx / (STEPS.length - 1)) * (100 - 8) : 0
 
   return (
     <div className="bg-canvas rounded-3xl overflow-hidden shadow-card">
@@ -397,7 +482,7 @@ function TrackingCard({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="font-bold text-ink">{order.restaurant_name}</p>
-              <p className="text-xs text-fog mt-0.5">
+              <p className="text-xs text-fog mt-0.5 line-clamp-1">
                 {fmt(order.created_at, de)} · {items.map(i => `${i.qty}× ${i.name}`).join(', ')}
               </p>
             </div>
@@ -411,9 +496,13 @@ function TrackingCard({
 
       <div className="px-4 py-4">
         {isCancelled ? (
-          <div className="flex items-center gap-2 text-sm text-coral font-medium">
-            <span className="w-5 h-5 rounded-full bg-coral/10 flex items-center justify-center text-xs">✕</span>
-            {de ? 'Bestellung storniert' : 'Order cancelled'}
+          <div className="flex items-center gap-2.5 py-1">
+            <div className="w-8 h-8 rounded-full bg-coral/10 flex items-center justify-center flex-none">
+              <X className="w-4 h-4 text-coral" />
+            </div>
+            <p className="text-sm font-semibold text-coral">
+              {de ? 'Bestellung storniert' : 'Order cancelled'}
+            </p>
           </div>
         ) : isScheduled ? (
           <div className="flex items-center gap-2.5">
@@ -430,40 +519,93 @@ function TrackingCard({
             </div>
           </div>
         ) : (
-          <div className="relative">
-            <div className="absolute top-4 left-4 right-4 h-0.5 bg-cloud" style={{ zIndex: 0 }} />
-            <div
-              className="absolute top-4 left-4 h-0.5 bg-wolt-base transition-all duration-700"
-              style={{ zIndex: 0, width: stepIdx > 0 ? `${(stepIdx / (STEPS.length - 1)) * (100 - 8)}%` : '0%' }}
-            />
-            <div className="relative flex justify-between" style={{ zIndex: 1 }}>
-              {STEPS.map((step, i) => {
-                const done    = i < stepIdx
-                const current = i === stepIdx
-                const Icon    = step.icon
-                return (
-                  <div key={step.key} className="flex flex-col items-center gap-1.5" style={{ width: '20%' }}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
-                      done    ? 'bg-wolt-base'
-                      : current ? 'bg-wolt-base ring-4 ring-wolt-base/20'
-                      : 'bg-cloud'
-                    }`}>
-                      <Icon className={`w-3.5 h-3.5 ${done || current ? 'text-white' : 'text-fog'}`} />
-                    </div>
-                    <span className={`text-[9px] text-center leading-tight ${
-                      current ? 'text-wolt-base font-semibold' : done ? 'text-ink' : 'text-fog'
-                    }`}>
-                      {de ? step.de : step.en}
-                    </span>
+          <>
+            {/* Current status banner */}
+            {currentStep && (
+              <div className="flex items-center gap-3 mb-4 bg-wolt-light/70 rounded-2xl px-3.5 py-3">
+                <div className="relative flex-none">
+                  <div className="w-9 h-9 bg-wolt-base rounded-xl flex items-center justify-center">
+                    <StatusIcon className="w-4 h-4 text-white" />
                   </div>
-                )
-              })}
+                  <motion.div
+                    className="absolute inset-0 rounded-xl bg-wolt-base/35"
+                    animate={{ scale: [1, 1.55, 1], opacity: [0.7, 0, 0.7] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-ink text-sm leading-snug">
+                    {de ? currentStep.de : currentStep.en}
+                  </p>
+                  <p className="text-xs text-fog mt-0.5 leading-snug">
+                    {de ? STATUS_DESCRIPTIONS[order.status]?.de : STATUS_DESCRIPTIONS[order.status]?.en}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-none">
+                  <motion.span
+                    className="block w-1.5 h-1.5 bg-emerald rounded-full"
+                    animate={{ opacity: [1, 0.25, 1] }}
+                    transition={{ duration: 1.6, repeat: Infinity }}
+                  />
+                  <span className="text-[11px] text-fog font-medium">Live</span>
+                </div>
+              </div>
+            )}
+
+            {/* Step track */}
+            <div className="relative">
+              {/* Background rail */}
+              <div className="absolute top-4 left-4 right-4 h-0.5 bg-cloud" style={{ zIndex: 0 }} />
+              {/* Animated progress fill */}
+              <motion.div
+                className="absolute top-4 left-4 h-0.5 bg-wolt-base"
+                style={{ zIndex: 0 }}
+                initial={false}
+                animate={{ width: `${progressPct}%` }}
+                transition={{ duration: 0.85, ease: [0.4, 0, 0.2, 1] }}
+              />
+              {/* Steps */}
+              <div className="relative flex justify-between" style={{ zIndex: 1 }}>
+                {STEPS.map((step, i) => {
+                  const done    = i < stepIdx
+                  const current = i === stepIdx
+                  const Icon    = step.icon
+                  return (
+                    <div key={step.key} className="flex flex-col items-center gap-1.5" style={{ width: `${100 / STEPS.length}%` }}>
+                      <div className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-500 ${
+                        done || current ? 'bg-wolt-base' : 'bg-cloud'
+                      }`}>
+                        {current && (
+                          <motion.div
+                            className="absolute inset-0 rounded-full bg-wolt-base/35"
+                            animate={{ scale: [1, 1.75, 1], opacity: [0.9, 0, 0.9] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                          />
+                        )}
+                        <Icon className={`relative z-10 w-3.5 h-3.5 transition-colors duration-500 ${
+                          done || current ? 'text-white' : 'text-fog/40'
+                        }`} />
+                      </div>
+                      <span className={`text-[9px] text-center leading-tight transition-colors duration-500 ${
+                        current ? 'text-wolt-base font-bold' : done ? 'text-ink/60' : 'text-fog/40'
+                      }`}>
+                        {de ? step.de : step.en}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          </>
+        )}
+
+        {/* Live courier map — only when on_the_way and coordinates available */}
+        {isOnTheWay && order.courier_lat != null && order.courier_lng != null && (
+          <CourierMap lat={order.courier_lat} lng={order.courier_lng} de={de} />
         )}
 
         {order.estimated_minutes != null && !isCancelled && order.status !== 'delivered' && (
-          <div className="flex items-center gap-1.5 mt-3 text-xs text-fog">
+          <div className="flex items-center gap-1.5 mt-4 text-xs text-fog">
             <Clock className="w-3.5 h-3.5" />
             {de ? `Geschätzte Lieferzeit: ${order.estimated_minutes} Min.` : `Est. delivery: ${order.estimated_minutes} min`}
           </div>
@@ -522,10 +664,11 @@ export function Orders() {
   const { lang }  = useLangStore()
   const de        = lang === 'de'
   const { user, loading: authLoading } = useAuth()
-  const [orders, setOrders]     = useState<OrderRow[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [detail, setDetail]     = useState<OrderRow | null>(null)
-  const [reviewing, setReviewing] = useState<OrderRow | null>(null)
+  const [orders, setOrders]         = useState<OrderRow[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [detail, setDetail]         = useState<OrderRow | null>(null)
+  const [reviewing, setReviewing]   = useState<OrderRow | null>(null)
+  const reviewedIds = useRef<Set<string>>(new Set())
   const addItem = useCartStore(s => s.addItem)
 
   const load = useCallback(async () => {
@@ -563,6 +706,12 @@ export function Orders() {
         }
         const event = statusEventMap[updated.status]
         if (event) sendNotification(event, updated.restaurant_name)
+
+        if (updated.status === 'delivered' && !reviewedIds.current.has(updated.id)) {
+          reviewedIds.current.add(updated.id)
+          setDetail(null)
+          setReviewing(updated)
+        }
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -570,7 +719,18 @@ export function Orders() {
 
   async function confirmDelivered(orderId: string) {
     await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId)
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'delivered' as const } : o))
+    setOrders(prev => {
+      const updated = prev.map(o => o.id === orderId ? { ...o, status: 'delivered' as const } : o)
+      if (!reviewedIds.current.has(orderId)) {
+        const order = updated.find(o => o.id === orderId)
+        if (order) {
+          reviewedIds.current.add(orderId)
+          setDetail(null)
+          setReviewing(order)
+        }
+      }
+      return updated
+    })
   }
 
   function handleOrderAgain(order: OrderRow) {

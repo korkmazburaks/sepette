@@ -1,36 +1,66 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ShoppingBag, Trash2, Check, ChevronRight, CalendarClock, User } from 'lucide-react'
+import { X, ShoppingBag, Trash2, Check, ChevronRight, CalendarClock, User, Phone, MapPin } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { CartItem } from './CartItem'
 import { formatPrice } from '@/lib/utils'
 import { useLangStore } from '@/store/langStore'
 import { getT } from '@/i18n'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/useProfile'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useOrders } from '@/hooks/useOrders'
 import { sendNotification } from '@/hooks/useNotifications'
 
 const SLOT_MINS = [30, 60, 120, 180, 240]
 
+const PHONE_RE = /^\+?[\d\s\-(). ]{7,20}$/
+
+function validatePhone(p: string, de: boolean): string | null {
+  if (!p.trim()) return de ? 'Telefonnummer ist erforderlich' : 'Phone number is required'
+  if (!PHONE_RE.test(p.trim())) return de ? 'Ungültige Nummer (z.B. +49 170 1234567)' : 'Invalid phone (e.g. +49 170 1234567)'
+  return null
+}
+
+function validateAddress(a: string, de: boolean): string | null {
+  if (!a.trim()) return de ? 'Lieferadresse ist erforderlich' : 'Delivery address is required'
+  if (a.trim().length < 5) return de ? 'Bitte vollständige Adresse eingeben' : 'Please enter a complete address'
+  return null
+}
+
 function addMinutes(mins: number): string {
   const d = new Date(Date.now() + mins * 60000)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function Field({
-  label, value, onChange, type = 'text', placeholder,
-}: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+interface FieldProps {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  placeholder?: string
+  error?: string
+  icon?: React.ReactNode
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, error, icon }: FieldProps) {
   return (
     <div>
-      <label className="text-[11px] font-semibold text-fog mb-1 block">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full bg-mist rounded-xl px-3.5 py-2.5 text-sm text-ink placeholder:text-fog/60 outline-none focus:ring-2 focus:ring-wolt-base/30"
-      />
+      <label className="text-[11px] font-semibold text-fog mb-1 block uppercase tracking-wide">{label}</label>
+      <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 transition-colors ${
+        error ? 'bg-coral/5 ring-2 ring-coral/40' : 'bg-mist focus-within:ring-2 focus-within:ring-wolt-base/30'
+      }`}>
+        {icon && <span className="text-fog flex-none">{icon}</span>}
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-sm text-ink placeholder:text-fog/60 outline-none"
+        />
+      </div>
+      {error && <p className="text-[11px] text-coral mt-1 px-0.5">{error}</p>}
     </div>
   )
 }
@@ -40,7 +70,9 @@ export function CartSheet() {
   const { lang } = useLangStore()
   const t = getT(lang)
   const constraintsRef = useRef(null)
+  const navigate = useNavigate()
   const { user } = useAuth()
+  const { profile } = useProfile(user)
   const { activeAddress } = useSettingsStore()
   const { placeOrder } = useOrders(user)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
@@ -53,16 +85,20 @@ export function CartSheet() {
   const [guestPhone,     setGuestPhone]     = useState('')
   const [guestAddress,   setGuestAddress]   = useState('')
 
+  // Logged-in user: fields shown only when profile data is missing
+  const [loggedInPhone,   setLoggedInPhone]   = useState('')
+  const [loggedInAddress, setLoggedInAddress] = useState('')
+
+  // Inline validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
   const subtotal = totalPrice()
   const de = lang === 'de'
 
   const isGuest = !user
-  const guestValid = !isGuest || (
-    guestFirstName.trim().length > 0 &&
-    guestLastName.trim().length > 0 &&
-    guestPhone.trim().length > 0 &&
-    guestAddress.trim().length > 0
-  )
+  const savedPhone       = profile?.phone ?? ''
+  const showPhoneField   = !isGuest && !savedPhone
+  const showAddressField = !isGuest && !activeAddress
 
   const slotLabel = (mins: number) => {
     if (mins === 30)  return de ? 'In 30 Min' : 'In 30 min'
@@ -72,12 +108,38 @@ export function CartSheet() {
     return de ? 'In 4 Std' : 'In 4 hrs'
   }
 
-  const deliveryAddress = isGuest
-    ? guestAddress.trim()
-    : (activeAddress || (de ? 'Keine Adresse' : 'No address'))
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {}
+
+    if (isGuest) {
+      if (!guestFirstName.trim())
+        errs.firstName = de ? 'Pflichtfeld' : 'Required'
+      if (!guestLastName.trim())
+        errs.lastName = de ? 'Pflichtfeld' : 'Required'
+      const phoneErr = validatePhone(guestPhone, de)
+      if (phoneErr) errs.phone = phoneErr
+      const addrErr = validateAddress(guestAddress, de)
+      if (addrErr) errs.address = addrErr
+    } else {
+      if (showPhoneField) {
+        const phoneErr = validatePhone(loggedInPhone, de)
+        if (phoneErr) errs.phone = phoneErr
+      }
+      if (showAddressField) {
+        const addrErr = validateAddress(loggedInAddress, de)
+        if (addrErr) errs.address = addrErr
+      }
+    }
+
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  const effectivePhone   = isGuest ? guestPhone.trim()   : (savedPhone || loggedInPhone.trim())
+  const effectiveAddress = isGuest ? guestAddress.trim() : (activeAddress || loggedInAddress.trim())
 
   const handleOrder = async () => {
-    if (ordering || !guestValid) return
+    if (ordering || !validate()) return
     setOrdering(true)
     const rname = restaurantName ?? restaurantId ?? 'Restaurant'
     if (items.length > 0) {
@@ -85,18 +147,21 @@ export function CartSheet() {
         restaurantName: rname,
         items: items.map(i => ({ name: i.name, price: i.price, qty: i.quantity })),
         total: subtotal,
-        address: deliveryAddress,
+        address: effectiveAddress,
         guestName:  isGuest ? `${guestFirstName.trim()} ${guestLastName.trim()}` : undefined,
-        guestPhone: isGuest ? guestPhone.trim() : undefined,
+        guestPhone: isGuest ? effectivePhone : undefined,
       })
     }
     sendNotification('order_placed', rname)
     setSuccess(true)
-    setTimeout(() => { clearCart(); closeSheet(); setSuccess(false); setOrdering(false) }, 1400)
+    setTimeout(() => {
+      clearCart(); closeSheet(); setSuccess(false); setOrdering(false)
+      if (user) navigate('/orders')
+    }, 1400)
   }
 
   const handleSchedule = async () => {
-    if (ordering || selectedSlot === null || !guestValid) return
+    if (ordering || selectedSlot === null || !validate()) return
     setOrdering(true)
     const rname = restaurantName ?? restaurantId ?? 'Restaurant'
     if (items.length > 0) {
@@ -105,16 +170,17 @@ export function CartSheet() {
         restaurantName: rname,
         items: items.map(i => ({ name: i.name, price: i.price, qty: i.quantity })),
         total: subtotal,
-        address: deliveryAddress,
+        address: effectiveAddress,
         scheduledFor,
         guestName:  isGuest ? `${guestFirstName.trim()} ${guestLastName.trim()}` : undefined,
-        guestPhone: isGuest ? guestPhone.trim() : undefined,
+        guestPhone: isGuest ? effectivePhone : undefined,
       })
     }
     sendNotification('order_placed', rname)
     setSuccess(true)
     setTimeout(() => {
       clearCart(); closeSheet(); setSuccess(false); setOrdering(false); setSelectedSlot(null)
+      if (user) navigate('/orders')
     }, 1600)
   }
 
@@ -195,13 +261,8 @@ export function CartSheet() {
                       </div>
                     </div>
 
-                    {/* Logged-in address */}
-                    {!isGuest && activeAddress && (
-                      <p className="text-xs text-fog">📍 {activeAddress}</p>
-                    )}
-
-                    {/* Guest form */}
-                    {isGuest && (
+                    {/* Delivery details */}
+                    {isGuest ? (
                       <div className="space-y-2.5 bg-mist/50 rounded-2xl p-3.5">
                         <div className="flex items-center gap-1.5 mb-1">
                           <User className="w-3.5 h-3.5 text-wolt-base" />
@@ -213,41 +274,83 @@ export function CartSheet() {
                           <Field
                             label={de ? 'Vorname' : 'First name'}
                             value={guestFirstName}
-                            onChange={setGuestFirstName}
+                            onChange={v => { setGuestFirstName(v); setErrors(e => ({ ...e, firstName: '' })) }}
                             placeholder="Max"
+                            error={errors.firstName}
                           />
                           <Field
                             label={de ? 'Nachname' : 'Last name'}
                             value={guestLastName}
-                            onChange={setGuestLastName}
+                            onChange={v => { setGuestLastName(v); setErrors(e => ({ ...e, lastName: '' })) }}
                             placeholder="Mustermann"
+                            error={errors.lastName}
                           />
                         </div>
                         <Field
                           label={de ? 'Telefon' : 'Phone'}
                           value={guestPhone}
-                          onChange={setGuestPhone}
+                          onChange={v => { setGuestPhone(v); setErrors(e => ({ ...e, phone: '' })) }}
                           type="tel"
                           placeholder="+49 170 1234567"
+                          error={errors.phone}
+                          icon={<Phone className="w-3.5 h-3.5" />}
                         />
                         <Field
                           label={de ? 'Lieferadresse' : 'Delivery address'}
                           value={guestAddress}
-                          onChange={setGuestAddress}
+                          onChange={v => { setGuestAddress(v); setErrors(e => ({ ...e, address: '' })) }}
                           placeholder={de ? 'Musterstraße 1, 87435 Kempten' : '123 Main St, City'}
+                          error={errors.address}
+                          icon={<MapPin className="w-3.5 h-3.5" />}
                         />
                       </div>
+                    ) : (
+                      (showPhoneField || showAddressField || activeAddress) && (
+                        <div className="space-y-2.5 bg-mist/50 rounded-2xl p-3.5">
+                          {activeAddress && (
+                            <p className="text-xs text-fog flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-wolt-base flex-none" />
+                              {activeAddress}
+                            </p>
+                          )}
+                          {showAddressField && (
+                            <Field
+                              label={de ? 'Lieferadresse' : 'Delivery address'}
+                              value={loggedInAddress}
+                              onChange={v => { setLoggedInAddress(v); setErrors(e => ({ ...e, address: '' })) }}
+                              placeholder={de ? 'Musterstraße 1, 87435 Kempten' : '123 Main St, City'}
+                              error={errors.address}
+                              icon={<MapPin className="w-3.5 h-3.5" />}
+                            />
+                          )}
+                          {showPhoneField && (
+                            <Field
+                              label={de ? 'Telefon' : 'Phone'}
+                              value={loggedInPhone}
+                              onChange={v => { setLoggedInPhone(v); setErrors(e => ({ ...e, phone: '' })) }}
+                              type="tel"
+                              placeholder="+49 170 1234567"
+                              error={errors.phone}
+                              icon={<Phone className="w-3.5 h-3.5" />}
+                            />
+                          )}
+                        </div>
+                      )
                     )}
 
                     {restaurantIsOpen ? (
                       <button
                         onClick={handleOrder}
-                        disabled={ordering || !guestValid}
+                        disabled={ordering}
                         className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-wolt active:scale-[0.98] transition-all text-white disabled:opacity-50 ${success ? 'bg-emerald' : 'bg-wolt-base'}`}
                       >
                         {success ? (
                           <span className="flex-1 flex items-center justify-center gap-2 font-semibold text-base">
                             <Check className="w-5 h-5" />{de ? 'Bestellung aufgegeben!' : 'Order placed!'}
+                          </span>
+                        ) : ordering ? (
+                          <span className="flex-1 flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           </span>
                         ) : (
                           <>
@@ -291,13 +394,17 @@ export function CartSheet() {
                         </div>
                         <button
                           onClick={handleSchedule}
-                          disabled={ordering || selectedSlot === null || !guestValid}
+                          disabled={ordering || selectedSlot === null}
                           className={`w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-wolt active:scale-[0.98] transition-all text-white disabled:opacity-50 ${success ? 'bg-emerald' : 'bg-wolt-base'}`}
                         >
                           {success ? (
                             <span className="flex-1 flex items-center justify-center gap-2 font-semibold text-base">
                               <Check className="w-5 h-5" />
                               {de ? 'Vorbestellung gespeichert!' : 'Pre-order saved!'}
+                            </span>
+                          ) : ordering ? (
+                            <span className="flex-1 flex items-center justify-center">
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             </span>
                           ) : (
                             <>

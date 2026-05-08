@@ -1,9 +1,9 @@
-import { useEffect, useState, memo } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Star, Clock, Tag } from 'lucide-react'
 import type { Restaurant } from '@/types'
-import { fetchRestaurants, MENUS } from '@/lib/lieferando'
+import { fetchRestaurants } from '@/lib/lieferando'
 import { supabase } from '@/lib/supabase'
 import { computeIsOpen } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
@@ -20,11 +20,6 @@ import { useLangStore } from '@/store/langStore'
 import { useLocationStore } from '@/store/locationStore'
 import { haversineKm, formatPrice } from '@/lib/utils'
 
-const FoodImg = memo(function FoodImg({ src, alt, className }: { src: string; alt: string; className: string }) {
-  const [error, setError] = useState(false)
-  if (error) return <div className={`${className} bg-mist flex items-center justify-center text-3xl select-none`}>🍽️</div>
-  return <img src={src} alt={alt} loading="lazy" onError={() => setError(true)} className={className} />
-})
 
 const pageVariants = {
   initial: { x: '-25%', opacity: 0 },
@@ -32,33 +27,8 @@ const pageVariants = {
   exit:    { x: '-25%', opacity: 0, transition: { duration: 0.18, ease: 'easeIn' as const } },
 }
 
-type PopularItem = {
-  id: string
-  name: string
-  price: number
-  imageUrl?: string
-  restaurantName: string
-  restaurantSlug: string
-}
-
 type FoodMatch = { name: string; price: number; description?: string }
 type FoodResult = { restaurant: Restaurant; items: FoodMatch[] }
-
-function buildPopularItems(restaurants: Restaurant[]): PopularItem[] {
-  const out: PopularItem[] = []
-  for (const [slug, categories] of Object.entries(MENUS)) {
-    const r = restaurants.find(x => x.slug === slug)
-    if (!r) continue
-    for (const cat of categories) {
-      for (const item of cat.items) {
-        if (item.popular) {
-          out.push({ id: item.id, name: item.name, price: item.price, imageUrl: item.imageUrl, restaurantName: r.name, restaurantSlug: slug })
-        }
-      }
-    }
-  }
-  return out
-}
 
 const CATEGORY_CUISINE_MAP: Record<string, string[]> = {
   pizza:  ['pizza', 'Pizza', 'Italienisch', 'italian'],
@@ -76,9 +46,12 @@ export function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const [foodResults, setFoodResults] = useState<FoodResult[]>([])
   const { lang } = useLangStore()
   const { lat, lng, status, request } = useLocationStore()
   const de = lang === 'de'
+  const restaurantsRef = useRef(restaurants)
+  restaurantsRef.current = restaurants
 
   useEffect(() => {
     if (status === 'idle') request()
@@ -87,7 +60,6 @@ export function Home() {
   useEffect(() => {
     fetchRestaurants().then(data => { setRestaurants(data); setLoading(false) })
 
-    // Realtime: restaurant panel'den is_open / paused / hours değişince anında yansısın
     const { setRestaurantIsOpen } = useCartStore.getState()
     const ch = supabase.channel('home-restaurants')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurants' }, (payload) => {
@@ -101,6 +73,48 @@ export function Home() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
+
+  // Debounced food search via Supabase
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (q.length === 0) { setFoodResults([]); return }
+
+    const timer = setTimeout(async () => {
+      const { data: items } = await supabase
+        .from('menu_items')
+        .select('restaurant_id, name, price, description')
+        .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+        .eq('available', true)
+        .limit(50)
+
+      if (!items || items.length === 0) { setFoodResults([]); return }
+
+      const restaurantIds = [...new Set((items as { restaurant_id: string }[]).map(i => i.restaurant_id))]
+      const { data: slugRows } = await supabase
+        .from('restaurants')
+        .select('id, slug')
+        .in('id', restaurantIds)
+
+      const slugMap = new Map((slugRows ?? []).map((r: { id: string; slug: string }) => [r.id, r.slug]))
+
+      const grouped = new Map<string, FoodMatch[]>()
+      for (const item of items as { restaurant_id: string; name: string; price: number; description?: string }[]) {
+        const slug = slugMap.get(item.restaurant_id)
+        if (!slug) continue
+        if (!grouped.has(slug)) grouped.set(slug, [])
+        grouped.get(slug)!.push({ name: item.name, price: item.price, description: item.description || undefined })
+      }
+
+      const results: FoodResult[] = []
+      for (const [slug, foodItems] of grouped) {
+        const restaurant = restaurantsRef.current.find(r => r.slug === slug)
+        if (restaurant) results.push({ restaurant, items: foodItems })
+      }
+      setFoodResults(results)
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const withDistance: Restaurant[] = restaurants.map(r => ({
     ...r,
@@ -134,7 +148,6 @@ export function Home() {
   const featured = withDistance[0] ?? null
   const rest = applyFiltersAndSort(filterByCuisine(withDistance.slice(1)))
   const deals = withDistance.filter(r => r.deliveryFee === 0)
-  const popularItems = buildPopularItems(withDistance)
 
   const q = searchQuery.trim().toLowerCase()
 
@@ -145,28 +158,8 @@ export function Home() {
       )
     : []
 
-  const foodResults: FoodResult[] = q.length > 0
-    ? Object.entries(MENUS).flatMap(([slug, categories]) => {
-        const restaurant = withDistance.find(r => r.slug === slug)
-        if (!restaurant) return []
-        const items = categories.flatMap(cat =>
-          cat.items
-            .filter(item =>
-              item.name.toLowerCase().includes(q) ||
-              item.description?.toLowerCase().includes(q)
-            )
-            .map(item => ({ name: item.name, price: item.price, description: item.description }))
-        )
-        if (items.length === 0) return []
-        return [{ restaurant, items }]
-      })
-    : []
-
-  // Merge: restaurants that appear in foodResults but not restaurantResults go into a combined list
   const allMatchSlugs = new Set(foodResults.map(fr => fr.restaurant.slug))
   const pureRestaurantResults = restaurantResults.filter(r => !allMatchSlugs.has(r.slug))
-
-  // Combined: restaurants with food matches shown with items, pure restaurant matches shown as cards
   const hasResults = restaurantResults.length > 0 || foodResults.length > 0
 
   return (
@@ -191,32 +184,6 @@ export function Home() {
           ) : (
             <div className="mb-nav space-y-6">
               {featured && <FeaturedCard restaurant={featured} />}
-
-              {/* Populäre Gerichte */}
-              {popularItems.length > 0 && (
-                <section>
-                  <SectionHeader label={de ? 'Beliebte Gerichte' : 'Popular Dishes'} />
-                  <div className="scroll-x flex gap-3 px-4 pb-1">
-                    {popularItems.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => navigate(`/restaurant/${item.restaurantSlug}`)}
-                        className="flex-none w-36 bg-canvas border border-cloud rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform"
-                      >
-                        {item.imageUrl
-                          ? <FoodImg src={item.imageUrl} alt={item.name} className="w-full h-24 object-cover" />
-                          : <div className="w-full h-24 bg-mist flex items-center justify-center text-3xl">🍽️</div>
-                        }
-                        <div className="p-2.5">
-                          <p className="text-xs font-semibold text-ink leading-tight line-clamp-2">{item.name}</p>
-                          <p className="text-[10px] text-fog mt-0.5 truncate">{item.restaurantName}</p>
-                          <p className="text-xs font-bold text-wolt-base mt-1">{formatPrice(item.price)}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
 
               {/* Deals */}
               {deals.length > 0 && (

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
-import { Mail } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Mail, Eye, EyeOff, ArrowLeft, Check } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 const STRIP_A = [
@@ -54,10 +54,7 @@ function PhotoStrip({ photos, direction, speed = 28 }: {
       <div ref={ref} className="flex gap-2 will-change-transform">
         {doubled.map((src, i) => (
           <img
-            key={i}
-            src={src}
-            alt=""
-            draggable={false}
+            key={i} src={src} alt="" draggable={false}
             className="h-24 w-36 object-cover rounded-2xl flex-none select-none bg-stone-800"
             loading="eager"
           />
@@ -86,15 +83,141 @@ function AppleIcon() {
   )
 }
 
+/* ── Email auth panel ──────────────────────────────────────── */
+function EmailPanel({ de, onBack, onDone }: { de: boolean; onBack: () => void; onDone: () => void }) {
+  const { signIn, signUp } = useAuth()
+  const [mode, setMode]         = useState<'login' | 'signup'>('login')
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw]     = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [done, setDone]         = useState(false)
+
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    if (mode === 'signup' && !name.trim()) {
+      setError(de ? 'Bitte Namen eingeben' : 'Please enter your name')
+      return
+    }
+    setLoading(true)
+    if (mode === 'login') {
+      const err = await signIn(email, password)
+      if (err) { setError(err.message); setLoading(false); return }
+      onDone()
+    } else {
+      const err = await signUp(email, password, name.trim())
+      if (err) { setError(err.message); setLoading(false); return }
+      setDone(true)
+      setTimeout(onDone, 2200)
+    }
+    setLoading(false)
+  }
+
+  if (done) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center">
+          <Check className="w-7 h-7 text-green-400" />
+        </div>
+        <p className="font-bold text-white text-lg">
+          {de ? 'Bestätigungs-E-Mail gesendet!' : 'Confirmation email sent!'}
+        </p>
+        <p className="text-sm text-white/70 px-4">
+          {de ? `Bitte bestätige: ${email}` : `Please confirm: ${email}`}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-3 mb-5">
+        <button onClick={onBack} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+          <ArrowLeft className="w-4 h-4 text-white" />
+        </button>
+        <h2 className="font-bold text-white text-base">
+          {mode === 'login' ? (de ? 'Anmelden' : 'Sign in') : (de ? 'Konto erstellen' : 'Create account')}
+        </h2>
+      </div>
+
+      <div className="flex p-1 bg-white/10 rounded-xl mb-4">
+        {(['login', 'signup'] as const).map(m => (
+          <button
+            key={m}
+            onClick={() => { setMode(m); setError('') }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+              mode === m ? 'bg-white text-ink' : 'text-white/70'
+            }`}
+          >
+            {m === 'login' ? (de ? 'Anmelden' : 'Sign in') : (de ? 'Registrieren' : 'Register')}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={submit} className="space-y-3">
+        {mode === 'signup' && (
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setError('') }}
+            placeholder={de ? 'Vollständiger Name' : 'Full name'}
+            required
+            className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/60 transition-colors"
+          />
+        )}
+        <input
+          type="email"
+          value={email}
+          onChange={e => { setEmail(e.target.value); setError('') }}
+          placeholder={de ? 'E-Mail-Adresse' : 'Email address'}
+          required
+          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/60 transition-colors"
+        />
+        <div className="relative">
+          <input
+            type={showPw ? 'text' : 'password'}
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError('') }}
+            placeholder={de ? 'Passwort (mind. 6 Zeichen)' : 'Password (min. 6 chars)'}
+            required
+            minLength={6}
+            className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder:text-white/50 outline-none focus:border-white/60 transition-colors"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw(v => !v)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+          >
+            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {error && <p className="text-red-300 text-xs px-1">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-wolt-base font-semibold text-sm text-white active:scale-[0.98] disabled:opacity-60 transition-all"
+        >
+          {loading
+            ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : (mode === 'login'
+                ? (de ? 'Anmelden' : 'Sign in')
+                : (de ? 'Konto erstellen' : 'Create account'))
+          }
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export function isIntroSeen() { return false }
 
 export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) {
-  const { signInWithGoogle } = useAuth()
-
-  async function handleGoogle() {
-    await signInWithGoogle()
-    onDone()
-  }
+  const { signInWithGoogle, signInWithApple } = useAuth()
+  const [showEmail, setShowEmail] = useState(false)
 
   return (
     <motion.div
@@ -117,61 +240,78 @@ export function IntroModal({ onDone, de }: { onDone: () => void; de: boolean }) 
         <div className="absolute inset-0 bg-ink/50" />
       </div>
 
-      {/* Centered content */}
       <div className="relative z-10 w-full max-w-mobile px-6 flex flex-col items-center gap-3">
-        {/* Brand */}
-        <motion.div
-          className="text-center mb-2"
-          initial={{ y: -16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1, transition: { delay: 0.1, type: 'spring', damping: 24 } }}
-        >
-          <h1 className="text-3xl font-black text-white tracking-tight">Sepette</h1>
-          <p className="text-base font-semibold text-white mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
-            {de ? 'Essen. Einfach.' : 'Food. Simple.'}
-          </p>
-        </motion.div>
+        <AnimatePresence mode="wait">
+          {showEmail ? (
+            <motion.div
+              key="email"
+              className="w-full"
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+            >
+              <EmailPanel de={de} onBack={() => setShowEmail(false)} onDone={onDone} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="main"
+              className="w-full flex flex-col items-center gap-3"
+              initial={{ x: -40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+            >
+              <motion.div
+                className="text-center mb-2"
+                initial={{ y: -16, opacity: 0 }}
+                animate={{ y: 0, opacity: 1, transition: { delay: 0.1, type: 'spring', damping: 24 } }}
+              >
+                <h1 className="text-3xl font-black text-white tracking-tight">Sepette</h1>
+                <p className="text-base font-semibold text-white mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
+                  {de ? 'Essen. Einfach.' : 'Food. Simple.'}
+                </p>
+              </motion.div>
 
-        {/* Buttons */}
-        <motion.div
-          className="w-full space-y-2.5"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1, transition: { delay: 0.2, type: 'spring', damping: 24 } }}
-        >
-          {/* Google */}
-          <button
-            onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white font-semibold text-sm text-ink active:scale-[0.98] transition-all"
-          >
-            <GoogleIcon />
-            {de ? 'Mit Google anmelden' : 'Continue with Google'}
-          </button>
+              <motion.div
+                className="w-full space-y-2.5"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1, transition: { delay: 0.2, type: 'spring', damping: 24 } }}
+              >
+                <button
+                  onClick={() => signInWithGoogle().then(onDone)}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white font-semibold text-sm text-ink active:scale-[0.98] transition-all"
+                >
+                  <GoogleIcon />
+                  {de ? 'Mit Google anmelden' : 'Continue with Google'}
+                </button>
 
-          {/* Apple */}
-          <button
-            onClick={onDone}
-            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/20 font-semibold text-sm text-white active:scale-[0.98] transition-all"
-          >
-            <AppleIcon />
-            {de ? 'Mit Apple anmelden' : 'Continue with Apple'}
-          </button>
+                <button
+                  onClick={() => signInWithApple().then(onDone)}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/20 font-semibold text-sm text-white active:scale-[0.98] transition-all"
+                >
+                  <AppleIcon />
+                  {de ? 'Mit Apple anmelden' : 'Continue with Apple'}
+                </button>
 
-          {/* Email */}
-          <button
-            onClick={onDone}
-            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 font-semibold text-sm text-white active:scale-[0.98] transition-all"
-          >
-            <Mail className="w-4 h-4" />
-            {de ? 'Mit E-Mail anmelden' : 'Continue with email'}
-          </button>
+                <button
+                  onClick={() => setShowEmail(true)}
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 font-semibold text-sm text-white active:scale-[0.98] transition-all"
+                >
+                  <Mail className="w-4 h-4" />
+                  {de ? 'Mit E-Mail anmelden' : 'Continue with email'}
+                </button>
 
-          {/* Skip */}
-          <button
-            onClick={onDone}
-            className="w-full flex items-center justify-center py-3.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 font-semibold text-sm text-white/80 active:scale-[0.98] transition-all"
-          >
-            {de ? 'Ohne Konto fortfahren' : 'Continue without account'}
-          </button>
-        </motion.div>
+                <button
+                  onClick={onDone}
+                  className="w-full flex items-center justify-center py-3.5 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 font-semibold text-sm text-white/80 active:scale-[0.98] transition-all"
+                >
+                  {de ? 'Ohne Konto fortfahren' : 'Continue without account'}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   )
